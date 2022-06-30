@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.my.main.dao.MainDao">
+
+
+	<select id="selectStudentAttend" resultType="CamelMap">
+	  	SELECT '112312412412' as ccc , '10' as aa FROM dual
+	</select>
+
+	<!-- 회원가입 정보 저장 -->
+	<select id="joinSave" resultType="CamelMap">
+	 INSERT ALL
+			INTO T_CM_USER(USER_ID, LOGIN_ID, LOGIN_PASS, USER_NM, MADE_DT, PHONE_NUM)
+		                VALUES(
+		        	     (SELECT NVL(MAX(USER_ID),0) + 1 FROM T_CM_USER)
+	                    ,#{joinId}
+	                    ,#{joinPass}
+	                    ,#{joinNm}
+	                    , SYSDATE
+	                    ,#{phoneNum})
+			INTO T_CM_USER_IMG(USER_ID, IMG_URL)
+		                VALUES(
+	                    (SELECT NVL(MAX(USER_ID),0) + 1 FROM T_CM_USER)
+	                    , #{imgUrl})
+		    SELECT * FROM DUAL
+	</select>
+
+	<!-- 스프링 시큐리티 로그인 정보가져오기 -->
+	<select id="selectUser" resultType="CamelMap">
+		 SELECT
+		  A.LOGIN_ID as userName
+		 ,A.LOGIN_PASS as password
+		 ,A.LOGIN_EN as enabled
+		 ,A.USER_AUTHORITY as authority
+		 ,A.USER_NM as nickname
+		 ,A.USER_ID as userId
+		 ,B.IMG_URL as imgUrl
+		 FROM T_CM_USER A
+		 	 ,T_CM_USER_IMG B
+		 WHERE LOGIN_ID = #{loginId}
+		 AND A.USER_ID = B.USER_ID
+		</select>
+
+
+
+	<!-- 프로필 이미지 바꾸기 -->
+	<select id="profileImgSave" parameterType="CamelMap">
+		UPDATE T_CM_USER_IMG SET
+         IMG_URL = #{imgUrl}
+         WHERE USER_ID = #{userId}
+	</select>
+
+	<!-- 프로필 수정하기 -->
+	<select id="profileSave" parameterType="CamelMap">
+		UPDATE T_CM_USER SET
+          LOGIN_ID = #{loginId}
+         ,LOGIN_PASS = #{password}
+         ,USER_NM = #{nickName}
+         ,UP_DT = SYSDATE
+         WHERE USER_ID = #{userId}
+	</select>
+
+	<!-- 메인 화면 주식 정보 가져오기  -->
+	<select id="getEquitiesInfo" resultType="CamelMap">
+
+		SELECT /* Mainsql.getEquitiesInfo */ * FROM(
+        SELECT ROW_NUMBER() OVER(PARTITION BY EQ_ID ORDER BY RE_TIME DESC) RN
+            ,EQ_NM
+	        ,EQ_ID
+	        ,EQ_VAL
+	        ,BF_CHG
+	    	,BF_VAL
+	        ,BF_PER
+	        ,UP_DOWN
+	        ,RE_TIME
+        FROM T_CM_EQUITIES_DATA
+        )WHERE RN = '1'
+        ORDER BY RE_TIME DESC
+	</select>
+
+	<!-- sms핸드폰 번호 가져오기  -->
+	<select id="getUserPhone" resultType="CamelMap">
+		 /* Mainsql.getUserPhone */
+		 SELECT PHONE_NUM, USER_NM FROM T_CM_USER WHERE USER_ID = #{userId}
+	</select>
+
+
+	<!-- 마이라운지 관심종목 가져오기  -->
+	<select id="getUserEquitiesData" resultType="CamelMap" parameterType="CamelMap">
+		/* getUserEquitiesData */
+<!-- 		SELECT  -->
+<!--              EQ_NM -->
+<!--             ,EQ_NUM -->
+<!--             ,EQ_PRICE -->
+<!--             ,CHG_VAL -->
+<!--             ,CHG_PCH -->
+<!--             ,RGST_DT -->
+<!--             ,EQ_URL -->
+<!--         FROM -->
+<!--             T_CM_USER_EQUITIES_DATA -->
+<!--         WHERE USER_ID = #{userId} -->
+<!--         ORDER BY RGST_DT DESC -->
+
+		WITH CM AS (
+		    SELECT * FROM(
+		    SELECT ROW_NUMBER() OVER(PARTITION BY CM.EQ_ID ORDER BY CM.EQ_ID ASC, CM.RE_TIME DESC) AS RN, EQ_NM, EQ_ID, EQ_VAL, BF_VAL, UP_DOWN, BF_CHG, BF_PER, RE_TIME
+		    FROM T_CM_EQUITIES_DATA CM
+		    ) where RN = '1'
+		)select CM.*,US.EQ_URL,US.EQ_HREF FROM T_CM_USER_EQUITIES_DATA US, CM
+		where US.USER_ID = #{userId}
+		AND CM.EQ_ID(+) = US.EQ_NUM
+		ORDER BY RE_TIME DESC
+	</select>
+
+	<select id="getEquitieData" resultType="CamelMap" parameterType="CamelMap">
+		SELECT * FROM(
+    		SELECT ROW_NUMBER() OVER(PARTITION BY CM.EQ_ID, TO_CHAR(CM.RE_TIME,'YYYY-MM-DD') ORDER BY RE_TIME DESC) AS RN, CM.EQ_NM, TO_CHAR(CM.RE_TIME, 'YYYY-MM-DD') AS RE_TIME, CM.EQ_VAL, CM.EQ_ID, CM.BF_VAL
+    		FROM T_CM_EQUITIES_DATA CM
+    		)WHERE RN='1'
+    	AND EQ_ID = #{eqId}
+    	ORDER BY RE_TIME ASC
+	</select>
+
+	<select id="getCosData" resultType="CamelMap" parameterType="CamelMap">
+		SELECT * FROM(
+    		SELECT ROW_NUMBER() OVER(PARTITION BY CM.EQ_ID, TO_CHAR(CM.RE_TIME,'YYYY-MM') ORDER BY RE_TIME DESC) AS RN, CM.EQ_NM, TO_CHAR(CM.RE_TIME, 'YYYY-MM') AS RE_TIME, CM.EQ_VAL, CM.EQ_ID
+    		FROM T_CM_EQUITIES_DATA CM
+    		)WHERE RN='1'
+    	AND EQ_ID = #{eqId}
+    	ORDER BY RE_TIME ASC
+	</select>
+
+	<select id="getTodayData" resultType="CamelMap" parameterType="CamelMap">
+		SELECT
+			EQ_NM,
+			EQ_ID,
+			EQ_VAL,
+			TO_CHAR(RE_TIME,'HH24:MI') AS RE_TIME
+		FROM
+			T_CM_EQUITIES_DATA
+		WHERE
+			TO_CHAR(RE_TIME, 'YYYY-MM-DD') = (SELECT TO_CHAR(SYSDATE, 'YYYY-MM-DD') FROM DUAL)
+		AND
+			EQ_ID = #{eqId}
+	</select>
+
+
+</mapper>

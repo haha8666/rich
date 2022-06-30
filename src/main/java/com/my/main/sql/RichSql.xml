@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.my.main.dao.RichDao">
+
+	
+	<select id="selectStudentAttend" resultType="CamelMap">
+	  	SELECT '112312412412' as ccc , '10' as aa FROM dual
+	</select>
+	
+	
+	
+	<!-- 마이라운지 관심 추가하기 -->
+	<select id="userEquitiesDataSave" resultType="CamelMap">
+		/* Rich.userEquitiesDataSave */
+		INSERT INTO T_CM_USER_EQUITIES_DATA
+		(
+			 USER_ID
+			,EQ_NM
+			,EQ_NUM
+			,RGST_DT
+			,EQ_URL
+			,EQ_HREF
+		)
+			VALUES
+			(
+			 #{userId}
+			,#{eqNm}
+			,#{eqNum}
+			,SYSDATE
+			,#{eqUrl}
+			,#{eqHref}
+			)
+	</select>
+	
+	
+	<!-- 마이라운지 관심종목 삭제하기  -->
+	<select id="deluserEquitiesData" resultType="CamelMap">
+	  	 
+	  	 /* Richsqp.deluserEquitiesData */
+        DELETE T_CM_USER_EQUITIES_DATA
+         WHERE USER_ID  = #{userId}
+           AND EQ_NUM = #{eqNum}
+           
+	</select>
+	
+	<!-- 종목 알림 삭제하기  -->
+	<select id="delEquitiesAlrim" resultType="CamelMap">
+	  	 
+	  	 /* Richsqp.delEquitiesAlrim */
+        DELETE T_CM_EQUITIES_ALRIM
+         WHERE USER_ID  = #{userId}
+           AND EQ_NUM = #{eqNum}
+           
+	</select>
+	
+	
+	
+	<!-- 마이라운지 관심종목 알림 정보가져오기  -->
+	<select id="getEquitiesAlrim" resultType="CamelMap">
+        
+	    SELECT /* Richsqp.getEquitiesAlrim */
+		 	 (SELECT ALRIM_PRICE FROM T_CM_EQUITIES_ALRIM WHERE EQ_NUM = #{eqNum} AND USER_ID = #{userId}) AS ALRIM_PRICE
+			,(SELECT ALRIM_STD FROM T_CM_EQUITIES_ALRIM WHERE EQ_NUM = #{eqNum} AND USER_ID = #{userId}) AS ALRIM_STD
+	    	,(SELECT MAX(EQ_NM) FROM T_CM_USER_EQUITIES_DATA WHERE EQ_NUM = #{eqNum}) AS EQ_NM
+		FROM DUAL
+
+	</select>
+	
+	
+	<!-- 마이라운지 관심종목 알림 설정하기  -->
+	<select id="setEquitiesAlrim" resultType="CamelMap">
+	  	 
+	  	 MERGE INTO /* Richsqp.setEquitiesAlrim */ T_CM_EQUITIES_ALRIM USING DUAL	
+        ON( EQ_NUM = #{eqNum} AND USER_ID = #{userId}) 	
+        WHEN MATCHED THEN UPDATE SET
+             ALRIM_PRICE = #{alrimPrice}
+		    ,ALRIM_STD = #{alrimStd}
+		    ,UP_DT = SYSDATE
+        WHEN NOT MATCHED THEN INSERT
+         		(
+         		 USER_ID
+         		,EQ_NUM
+                ,ALRIM_STD
+         		,ALRIM_PRICE
+                ,RGST_DT
+         		) 
+         VALUES (
+                 #{userId}
+                ,#{eqNum}
+                ,#{alrimStd}
+                ,#{alrimPrice}
+                ,SYSDATE
+                )
+	</select>
+
+	<!-- 주식 데이터 입력  -->
+	<select id="insEquitiesData" resultType="CamelMap">
+		/* insEquitiesData */
+		INSERT INTO T_CM_EQUITIES_DATA 
+		(
+		     EQ_NM
+		    ,EQ_ID
+		    ,EQ_VAL
+		    ,BF_VAL
+		    ,BF_CHG
+		    ,BF_PER
+		    ,UP_DOWN
+		    ,RE_TIME
+		)VALUES(
+		     #{eqNm}
+		    ,#{eqId}
+		    ,#{eqVal}
+		    ,#{bfVal}
+		    ,#{bfChg}
+		    ,#{bfPer}
+		    ,#{upDown}
+		    ,SYSDATE
+		)
+	</select>
+
+	<!-- 배치 URL 가져오기  -->
+	<select id="getEquitiesUrl" resultType="CamelMap">
+		/* getEquitiesUrl */
+		SELECT
+		     EQ_NM
+		    ,EQ_NUM
+		    ,EQ_HREF
+		FROM T_CM_USER_EQUITIES_DATA
+		WHERE RGST_DT IN (SELECT MAX(RGST_DT) FROM T_CM_USER_EQUITIES_DATA GROUP BY EQ_NUM)
+		ORDER BY RGST_DT ASC
+	</select>
+	
+	<!-- 알림 정보 가져오기  -->
+	<select id="compAlrim" resultType="CamelMap">
+		/* Richsql.compAlrim */
+	SELECT *
+	  FROM ( SELECT REPLACE(ALRIM_PRICE,',','') EQ_PRICE
+	            ,EQ_NUM
+	            ,(SELECT MAX(EQ_NM) FROM T_CM_EQUITIES_DATA WHERE EQ_ID=#{eqNum}) EQ_NM
+	            ,ALRIM_STD
+	            ,USER_ID
+	        FROM T_CM_EQUITIES_ALRIM
+	        WHERE EQ_NUM=#{eqNum}
+	          UNION ALL
+	         SELECT '0' AS EQ_PRICE, NULL AS EQ_NUM ,'No' AS EQ_NM, 'No' AS ALRIM_STD, 0 AS USER_ID
+	           FROM DUAL )
+	 WHERE EQ_NUM IS NOT NULL OR ROWNUM = 1
+	</select>
+
+	<!-- 종목 추가시 메인데이터 값 변환  -->
+	<select id="setEquitiesUserData" resultType="CamelMap">
+	MERGE INTO /* Richsql.setEquitiesUserData */ T_CM_EQUITIES_DATA USING DUAL   
+	        ON( EQ_ID = #{eqNum} AND RE_TIME = (SELECT MAX(RE_TIME) FROM T_CM_EQUITIES_DATA WHERE EQ_ID=#{eqNum}))   
+	        WHEN MATCHED THEN UPDATE SET
+	             EQ_VAL = #{eqVal}
+	            ,BF_CHG = #{bfChg}
+	            ,BF_PER = #{bfPer}
+	            ,UP_DOWN = #{upDown}
+	        WHEN NOT MATCHED THEN INSERT
+	                 (
+	                  EQ_NM
+	                 ,EQ_ID
+	                 ,EQ_VAL
+	                 ,BF_VAL
+	                 ,BF_CHG
+	                 ,RE_TIME
+	                 ,BF_PER
+	                 ,UP_DOWN
+	                 )
+	         VALUES (
+	                 #{eqNm}
+	                ,#{eqNum}
+	                ,#{eqVal}
+	                ,#{bfVal}
+	                ,#{bfChg}
+	                ,SYSDATE
+	                ,#{bfPer}
+	                ,#{upDown}
+	                )
+	</select>
+</mapper>
